@@ -1,0 +1,17 @@
+﻿@using NoteKeeperPro.Application.Dtos.Notes
+@model NoteKeeperPro.Web.ViewModels.Notes.NoteViewModel
+
+@{
+    ViewData["Title"] = "Edit";
+    ViewBag.Action = "Edit";
+}
+
+<div class="justify-content-center align-content-center mt-3">
+    <h1 class="col-8 my-4">Edit Employee</h1>
+    <partial name="Partials/CreateEditNotePartial" />
+</div>
+
+@section ValidationScripts
+{
+    <partial name="_ValidationScriptsPartial" />
+}

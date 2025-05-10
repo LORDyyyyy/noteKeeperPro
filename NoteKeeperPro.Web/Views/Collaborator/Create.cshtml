@@ -1,0 +1,38 @@
+﻿@using NoteKeeperPro.Application.Dtos.Collaborators
+@using NoteKeeperPro.Domain.Entities.Collaborators
+@model NoteKeeperPro.Web.ViewModels.Collaborators.CollaboratorViewModel
+
+@{
+    ViewData["Title"] = "Create";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+
+<form method="post" asp-controller="Note" asp-action="Create" class="col-8">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="form-group mb-3">
+        <label asp-for="UserName" class="form-label"></label>
+        <input asp-for="UserName" class="form-control" />
+        <span asp-validation-for="UserName" class="text-danger"></span>
+    </div>
+
+    <div class="form-group mb-3">
+        <label asp-for="PermissionType" class="form-label"></label>
+        <select asp-for="PermissionType" class="form-select">
+            <option value="">-- Select Permission --</option>
+            <option value="View">View</option>
+            <option value="Edit">Edit</option>
+        </select>
+        <span asp-validation-for="PermissionType" class="text-danger"></span>
+    </div>
+
+
+    <div class="mt-4">
+        <input type="submit" value="@ViewBag.Action" class="btn btn-primary" />
+        <a asp-controller="Note" asp-action="Index" class="btn btn-outline-dark">Back to List</a>
+    </div>
+</form>
+
+
+

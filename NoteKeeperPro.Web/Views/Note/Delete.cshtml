@@ -1,0 +1,92 @@
+﻿@using NoteKeeperPro.Application.Dtos.Notes
+@model NoteDetailsToReturnDto
+
+@{
+    ViewData["Title"] = "Delete Note";
+}
+
+<div class="container mt-4 fade-in">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h1 class="card-title text-center mb-4">Delete Note</h1>
+
+                    <div class="delete-confirmation">
+                        <h4 class="text-danger mb-3">Are you sure you want to
+                            delete this note?</h4>
+                        <p class="mb-0">This action cannot be undone. All
+                            associated data including tags and collaborators
+                            will be permanently removed.</p>
+                    </div>
+
+                    <div class="note-preview">
+                        <h5 class="mb-3">@Model.Title</h5>
+                        <div class="note-content mb-4">@Model.Content</div>
+
+                        <div class="note-meta mb-3">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <i class="fas fa-calendar-alt me-2"></i>
+                                    <strong>Created:</strong>
+                                    @Model.CreatedAt.ToString("g")
+                                </div>
+                                <div class="col-md-6">
+                                    <i class="fas fa-clock me-2"></i>
+                                    <strong>Last Updated:</strong>
+                                    @Model.UpdatedAt.ToString("g")
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (Model.Tags?.Any() == true)
+                        {
+                            <div class="mb-4">
+                                <h6 class="mb-2"><i
+                                        class="fas fa-tags me-2"></i>Tags</h6>
+                                <div class="tag-container">
+                                    @foreach (var tag in Model.Tags)
+                                    {
+                                        <span class="badge bg-primary">@tag.Name</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        @if (Model.Collaborators?.Any() == true)
+                        {
+                            <div class="mb-4">
+                                <h6 class="mb-2"><i
+                                        class="fas fa-users me-2"></i>Collaborators
+                                </h6>
+                                <div class="collaborator-list">
+                                    @foreach (var collaborator in
+                                                                    Model.Collaborators)
+                                    {
+                                        <div class="collaborator-item">
+                                            <i
+                                                class="fas fa-user me-2"></i>@collaborator.UserName
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <form asp-action="Delete" method="post" class="mt-4">
+                        <input type="hidden" asp-for="Id" />
+                        <div class="d-flex gap-3 justify-content-center">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash-alt me-2"></i>Delete Note
+                            </button>
+                            <a asp-action="Index" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Back to
+                                List
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

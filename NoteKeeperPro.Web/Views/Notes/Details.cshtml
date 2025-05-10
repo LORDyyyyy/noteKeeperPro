@@ -1,0 +1,67 @@
+@model NoteKeeperPro.Application.Dtos.Notes.NoteDto
+
+@{
+    ViewData["Title"] = "Note Details";
+}
+
+<div class="container">
+    <h1>@Model.Title</h1>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <small class="text-muted">Created: @Model.CreatedAt.ToString("g")</small>
+                        <small class="text-muted">Last Updated: @Model.UpdatedAt.ToString("g")</small>
+                    </div>
+
+                    <div class="mb-4">
+                        <h5>Content</h5>
+                        <p class="card-text">@Model.Content</p>
+                    </div>
+
+                    @if (Model.Tags.Any())
+                    {
+                        <div class="mb-4">
+                            <h5>Tags</h5>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var tag in Model.Tags)
+                                {
+                                    <span class="badge bg-primary">@tag.Name</span>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (Model.Collaborators.Any())
+                    {
+                        <div class="mb-4">
+                            <h5>Collaborators</h5>
+                            <div class="list-group">
+                                @foreach (var collaborator in Model.Collaborators)
+                                {
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>@collaborator.User.Email</span>
+                                        <form asp-action="RemoveCollaborator" method="post" class="d-inline">
+                                            <input type="hidden" name="noteId" value="@Model.Id" />
+                                            <input type="hidden" name="collaboratorId" value="@collaborator.Id" />
+                                            <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+                                        </form>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Edit</a>
+                <a asp-action="Share" asp-route-id="@Model.Id" class="btn btn-success">Share</a>
+                <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn-danger">Delete</a>
+                <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+            </div>
+        </div>
+    </div>
+</div> 
