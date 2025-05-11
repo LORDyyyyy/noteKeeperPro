@@ -17,5 +17,10 @@ namespace NoteKeeperPro.Application.Services.Notes
         Task<bool> DeleteNoteAsync(int id, string userId);
         Task<bool> ShareNoteAsync(int noteId, string collaboratorEmail, string userId);
         Task<bool> RemoveCollaboratorAsync(int noteId, string collaboratorEmail, string userId);
+
+        // New methods for recycle bin functionality
+        Task<IEnumerable<NoteToReturnDto>> GetDeletedNotesAsync(string userId);
+        Task<bool> RestoreNoteAsync(int id, string userId);
+        Task<bool> PermanentlyDeleteNoteAsync(int id, string userId);
     }
 }

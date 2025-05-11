@@ -29,17 +29,31 @@ namespace NoteKeeperPro.Web.Controllers
         }
         #endregion
 
+        #region Private Methods
+        private string GetCurrentUserId()
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+                throw new UnauthorizedAccessException("User is not authenticated");
+            return userId;
+        }
+        #endregion
+
         #region Index
         [HttpGet]
         public async Task<IActionResult> Index(string searchTerm)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            try
+            {
+                var userId = GetCurrentUserId();
+                var notes = await _noteService.SearchNotesAsync(userId, searchTerm);
+                ViewBag.SearchTerm = searchTerm;
+                return View(notes);
+            }
+            catch (UnauthorizedAccessException)
+            {
                 return RedirectToAction("Login", "Account");
-
-            var notes = await _noteService.SearchNotesAsync(userId, searchTerm);
-            ViewBag.SearchTerm = searchTerm; // Pass the search term to the view to maintain it in the search box
-            return View(notes);
+            }
         }
         #endregion
 
@@ -47,12 +61,16 @@ namespace NoteKeeperPro.Web.Controllers
         [HttpGet]
         public async Task<IActionResult> Create()
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
+            try
+            {
+                var userId = GetCurrentUserId();
+                ViewData["Notes"] = await _noteService.GetAllNotesAsync(userId);
+                return View();
+            }
+            catch (UnauthorizedAccessException)
+            {
                 return RedirectToAction("Login", "Account");
-
-            ViewData["Notes"] = await _noteService.GetAllNotesAsync(userId);
-            return View();
+            }
         }
 
         [HttpPost]
@@ -62,14 +80,9 @@ namespace NoteKeeperPro.Web.Controllers
             if (!ModelState.IsValid)
                 return View(noteVM);
 
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-                return RedirectToAction("Login", "Account");
-
-            string message = string.Empty;
-
             try
             {
+                var userId = GetCurrentUserId();
                 var result = await _noteService.CreateNoteAsync(new CreateNoteDto()
                 {
                     Title = noteVM.Title,
@@ -84,10 +97,12 @@ namespace NoteKeeperPro.Web.Controllers
                     return RedirectToAction(nameof(Index));
                 }
 
-                message = "Note Cannot be Created";
-                TempData["Message"] = message;
-                ModelState.AddModelError(string.Empty, message);
+                ModelState.AddModelError(string.Empty, "Note Cannot be Created");
                 return View(noteVM);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return RedirectToAction("Login", "Account");
             }
             catch (Exception ex)
             {
@@ -105,18 +120,22 @@ namespace NoteKeeperPro.Web.Controllers
         [HttpGet]
         public async Task<IActionResult> Details(int? id)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-                return RedirectToAction("Login", "Account");
-
             if (id == null)
                 return BadRequest();
 
-            var note = await _noteService.GetNoteByIdAsync(id.Value, userId);
-            if (note == null)
-                return NotFound();
+            try
+            {
+                var userId = GetCurrentUserId();
+                var note = await _noteService.GetNoteByIdAsync(id.Value, userId);
+                if (note == null)
+                    return NotFound();
 
-            return View(note);
+                return View(note);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return RedirectToAction("Login", "Account");
+            }
         }
         #endregion
 
@@ -124,30 +143,34 @@ namespace NoteKeeperPro.Web.Controllers
         [HttpGet]
         public async Task<IActionResult> Edit(int? id)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-                return RedirectToAction("Login", "Account");
-
             if (id == null)
                 return BadRequest();
 
-            var note = await _noteService.GetNoteByIdAsync(id.Value, userId);
-            if (note == null)
-                return NotFound();
-
-            return View(new NoteViewModel
+            try
             {
-                Id = note.Id,
-                Title = note.Title,
-                Content = note.Content,
-                TagNames = note.Tags?.Select(t => t.Name).ToList() ?? new(),
-                Collaborators = note.Collaborators?
-                    .Select(c => new CollaboratorViewModel
-                    {
-                        Id = c.Id,
-                        UserName = c.UserName
-                    }).ToList() ?? new()
-            });
+                var userId = GetCurrentUserId();
+                var note = await _noteService.GetNoteByIdAsync(id.Value, userId);
+                if (note == null)
+                    return NotFound();
+
+                return View(new NoteViewModel
+                {
+                    Id = note.Id,
+                    Title = note.Title,
+                    Content = note.Content,
+                    TagNames = note.Tags?.Select(t => t.Name).ToList() ?? new(),
+                    Collaborators = note.Collaborators?
+                        .Select(c => new CollaboratorViewModel
+                        {
+                            Id = c.Id,
+                            UserName = c.UserName
+                        }).ToList() ?? new()
+                });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return RedirectToAction("Login", "Account");
+            }
         }
 
         [HttpPost]
@@ -157,14 +180,9 @@ namespace NoteKeeperPro.Web.Controllers
             if (!ModelState.IsValid)
                 return View(noteVM);
 
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-                return RedirectToAction("Login", "Account");
-
-            string message = string.Empty;
-
             try
             {
+                var userId = GetCurrentUserId();
                 var result = await _noteService.UpdateNoteAsync(new UpdateNoteDto()
                 {
                     Id = id,
@@ -180,10 +198,12 @@ namespace NoteKeeperPro.Web.Controllers
                     return RedirectToAction(nameof(Index));
                 }
 
-                message = "Note Cannot Be Updated";
-                TempData["Message"] = message;
-                ModelState.AddModelError(string.Empty, message);
+                ModelState.AddModelError(string.Empty, "Note Cannot Be Updated");
                 return View(noteVM);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return RedirectToAction("Login", "Account");
             }
             catch (Exception ex)
             {
@@ -202,40 +222,44 @@ namespace NoteKeeperPro.Web.Controllers
         [HttpGet]
         public async Task<IActionResult> Delete(int? id)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-                return RedirectToAction("Login", "Account");
-
-            if (id is null)
+            if (id == null)
                 return BadRequest();
 
-            var note = await _noteService.GetNoteByIdAsync(id.Value, userId);
-            if (note == null)
-                return NotFound();
+            try
+            {
+                var userId = GetCurrentUserId();
+                var note = await _noteService.GetNoteByIdAsync(id.Value, userId);
+                if (note == null)
+                    return NotFound();
 
-            return View(note);
+                return View(note);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return RedirectToAction("Login", "Account");
+            }
         }
 
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-                return RedirectToAction("Login", "Account");
-
-            string message = string.Empty;
             try
             {
+                var userId = GetCurrentUserId();
                 var result = await _noteService.DeleteNoteAsync(id, userId);
                 if (result)
                 {
                     TempData["Message"] = "Note Deleted Successfully";
                     return RedirectToAction(nameof(Index));
                 }
-                message = "Note Cannot Be Deleted";
-                TempData["Message"] = message;
+
+                TempData["Message"] = "Note Cannot Be Deleted";
                 return RedirectToAction(nameof(Delete), new { id });
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return RedirectToAction("Login", "Account");
             }
             catch (Exception ex)
             {
@@ -245,6 +269,91 @@ namespace NoteKeeperPro.Web.Controllers
                     RequestId = HttpContext.TraceIdentifier
                 };
                 TempData["Message"] = "Note Cannot Be Deleted";
+                return View("Error", errorViewModel);
+            }
+        }
+        #endregion
+
+        #region Recycle Bin
+        [HttpGet]
+        public async Task<IActionResult> RecycleBin()
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var deletedNotes = await _noteService.GetDeletedNotesAsync(userId);
+                return View(deletedNotes);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return RedirectToAction("Login", "Account");
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Restore(int id)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var result = await _noteService.RestoreNoteAsync(id, userId);
+                if (result)
+                {
+                    TempData["Message"] = "Note Restored Successfully";
+                }
+                else
+                {
+                    TempData["Message"] = "Note Could Not Be Restored";
+                }
+                return RedirectToAction(nameof(RecycleBin));
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, ex.Message);
+                var errorViewModel = new ErrorViewModel
+                {
+                    RequestId = HttpContext.TraceIdentifier
+                };
+                TempData["Message"] = "An Error Occurred While Restoring the Note";
+                return View("Error", errorViewModel);
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PermanentlyDelete(int id)
+        {
+            try
+            {
+                var userId = GetCurrentUserId();
+                var result = await _noteService.PermanentlyDeleteNoteAsync(id, userId);
+                if (result)
+                {
+                    TempData["Message"] = "Note Permanently Deleted";
+                }
+                else
+                {
+                    TempData["Message"] = "Note Could Not Be Permanently Deleted";
+                }
+                return RedirectToAction(nameof(RecycleBin));
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return RedirectToAction("Login", "Account");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, ex.Message);
+                var errorViewModel = new ErrorViewModel
+                {
+                    RequestId = HttpContext.TraceIdentifier
+                };
+                TempData["Message"] = "An Error Occurred While Deleting the Note";
                 return View("Error", errorViewModel);
             }
         }

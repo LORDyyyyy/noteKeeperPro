@@ -57,10 +57,16 @@ namespace NoteKeeperPro.Application.Services.Notes
 
         public async Task<IEnumerable<NoteToReturnDto>> GetAllNotesAsync(string userId)
         {
-            var notes = await _noteRepository.GetAllAsync(userId);
-            return notes
-                .Where(n => n.OwnerId.Equals(userId) || n.NoteCollaborators.Any(c => c.Collaborator.Id.Equals(userId)))
-                .Select(MapToReturnDto);
+            var notes = await _context.Notes
+                .Include(n => n.NoteTags)
+                    .ThenInclude(nt => nt.Tag)
+                .Include(n => n.NoteCollaborators)
+                    .ThenInclude(nc => nc.Collaborator)
+                        .ThenInclude(c => c.User)
+                .Where(n => !n.IsDeleted && (n.OwnerId == userId || n.NoteCollaborators.Any(c => c.Collaborator.UserId == userId)))
+                .ToListAsync();
+
+            return notes.Select(MapToReturnDto);
         }
 
         public async Task<IEnumerable<NoteToReturnDto>> SearchNotesAsync(string userId, string searchTerm)
@@ -68,13 +74,26 @@ namespace NoteKeeperPro.Application.Services.Notes
             if (string.IsNullOrWhiteSpace(searchTerm))
                 return await GetAllNotesAsync(userId);
 
-            var notes = await _noteRepository.GetAllAsync(userId);
-            return notes
-                .Where(n => (n.OwnerId.Equals(userId) || n.NoteCollaborators.Any(c => c.Collaborator.Id.Equals(userId))) &&
-                           (n.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                            n.Content.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                            n.NoteTags.Any(t => t.Tag.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))))
-                .Select(MapToReturnDto);
+            // First get all non-deleted notes for the user
+            var notes = await _context.Notes
+                .Include(n => n.NoteTags)
+                    .ThenInclude(nt => nt.Tag)
+                .Include(n => n.NoteCollaborators)
+                    .ThenInclude(nc => nc.Collaborator)
+                        .ThenInclude(c => c.User)
+                .Where(n => !n.IsDeleted &&
+                           (n.OwnerId == userId || n.NoteCollaborators.Any(c => c.Collaborator.UserId == userId)))
+                .ToListAsync();
+
+            // Then perform the search in memory
+            var searchTermLower = searchTerm.ToLower();
+            var filteredNotes = notes.Where(n =>
+                n.Title.ToLower().Contains(searchTermLower) ||
+                n.Content.ToLower().Contains(searchTermLower) ||
+                n.NoteTags.Any(t => t.Tag.Name.ToLower().Contains(searchTermLower))
+            );
+
+            return filteredNotes.Select(MapToReturnDto);
         }
 
         public async Task<NoteToReturnDto> CreateNoteAsync(CreateNoteDto createNoteDto, string userId)
@@ -173,27 +192,27 @@ namespace NoteKeeperPro.Application.Services.Notes
 
         public async Task<bool> DeleteNoteAsync(int id, string userId)
         {
-            var note = await _noteRepository.GetAsync(id);
-            if (note == null || note.OwnerId != userId)
+            var note = await _context.Notes
+                .Include(n => n.NoteInfo)
+                .Include(n => n.NoteTags)
+                .Include(n => n.NoteCollaborators)
+                .FirstOrDefaultAsync(n => n.Id == id && n.OwnerId == userId);
+
+            if (note == null)
                 return false;
 
-            // Delete related entities first
+            // Soft delete the note
+            note.IsDeleted = true;
+            note.UpdatedAt = DateTime.UtcNow;
+
+            // Soft delete related note info if it exists
             if (note.NoteInfo != null)
             {
-                _context.NoteInfos.Remove(note.NoteInfo);
+                note.NoteInfo.IsDeleted = true;
             }
 
-            // Remove all note tags
-            note.NoteTags.Clear();
-
-            // Remove all note collaborators
-            note.NoteCollaborators.Clear();
-
-            // Save changes to remove related entities
             await _context.SaveChangesAsync();
-
-            // Now delete the note itself
-            return await _noteRepository.DeleteAsync(id, userId);
+            return true;
         }
 
         public async Task<bool> ShareNoteAsync(int noteId, string collaboratorEmail, string userId)
@@ -231,6 +250,66 @@ namespace NoteKeeperPro.Application.Services.Notes
             }
 
             return false;
+        }
+
+        public async Task<IEnumerable<NoteToReturnDto>> GetDeletedNotesAsync(string userId)
+        {
+            var notes = await _context.Notes
+                .Include(n => n.NoteTags)
+                    .ThenInclude(nt => nt.Tag)
+                .Include(n => n.NoteCollaborators)
+                    .ThenInclude(nc => nc.Collaborator)
+                        .ThenInclude(c => c.User)
+                .Where(n => n.IsDeleted && (n.OwnerId == userId || n.NoteCollaborators.Any(c => c.Collaborator.UserId == userId)))
+                .ToListAsync();
+
+            return notes.Select(MapToReturnDto);
+        }
+
+        public async Task<bool> RestoreNoteAsync(int id, string userId)
+        {
+            var note = await _context.Notes
+                .FirstOrDefaultAsync(n => n.Id == id && n.OwnerId == userId);
+
+            if (note == null)
+                return false;
+
+            note.IsDeleted = false;
+            note.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> PermanentlyDeleteNoteAsync(int id, string userId)
+        {
+            var note = await _context.Notes
+                .Include(n => n.NoteInfo)
+                .Include(n => n.NoteTags)
+                .Include(n => n.NoteCollaborators)
+                .FirstOrDefaultAsync(n => n.Id == id && n.OwnerId == userId);
+
+            if (note == null)
+                return false;
+
+            // Delete related entities first
+            if (note.NoteInfo != null)
+            {
+                _context.NoteInfos.Remove(note.NoteInfo);
+            }
+
+            // Remove all note tags
+            note.NoteTags.Clear();
+
+            // Remove all note collaborators
+            note.NoteCollaborators.Clear();
+
+            // Save changes to remove related entities
+            await _context.SaveChangesAsync();
+
+            // Now delete the note itself
+            _context.Notes.Remove(note);
+            await _context.SaveChangesAsync();
+            return true;
         }
 
         private static NoteToReturnDto MapToReturnDto(Note note)
